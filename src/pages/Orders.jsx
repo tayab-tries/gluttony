@@ -1,10 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronRight, Clock } from 'lucide-react';
 import MobileLayout from '../components/MobileLayout';
-import { MOCK_ORDERS } from '../lib/mockData';
-import { useAuthDemo } from '../lib/AuthDemoContext';
-import { base44 } from '../api/base44Client';
+import { useAuth } from '../lib/AuthContext';
+import { fetchOrders } from '../lib/backend';
 
 const STATUS_COLORS = {
   pending: 'text-yellow-400 bg-yellow-400/10',
@@ -17,27 +16,47 @@ const STATUS_COLORS = {
 };
 
 const STATUS_LABELS = {
-  pending: 'Pending', accepted: 'Accepted', preparing: 'Preparing',
-  ready: 'Ready', picked_up: 'On the way', delivered: 'Delivered', cancelled: 'Cancelled'
+  pending: 'Pending',
+  accepted: 'Accepted',
+  preparing: 'Preparing',
+  ready: 'Ready',
+  picked_up: 'On the way',
+  delivered: 'Delivered',
+  cancelled: 'Cancelled',
 };
 
 export default function Orders() {
   const [orders, setOrders] = useState([]);
-  const { currentUser } = useAuthDemo();
+  const { currentUser } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    loadOrders();
-  }, []);
+    let active = true;
 
-  const loadOrders = async () => {
-    try {
-      const data = await base44.entities.Order.filter({ customer_email: currentUser?.email });
-      setOrders(data.length > 0 ? data : MOCK_ORDERS.slice(0, 2));
-    } catch {
-      setOrders(MOCK_ORDERS.slice(0, 2));
+    async function load() {
+      const localDraftOrders = Object.keys(localStorage)
+        .filter(key => key.startsWith('gluttony_order_'))
+        .map(key => {
+          try {
+            return JSON.parse(localStorage.getItem(key));
+          } catch {
+            return null;
+          }
+        })
+        .filter(order => order?.customer_email === currentUser?.email);
+
+      const liveOrders = await fetchOrders({ customerEmail: currentUser?.email });
+      if (active) {
+        setOrders([...localDraftOrders, ...liveOrders]);
+      }
     }
-  };
+
+    load();
+
+    return () => {
+      active = false;
+    };
+  }, [currentUser?.email]);
 
   return (
     <MobileLayout>
@@ -76,7 +95,9 @@ export default function Orders() {
                 </div>
               </div>
               <div className="flex items-center justify-between">
-                <p className="text-muted-foreground text-xs">{order.items?.length} items</p>
+                <p className="text-muted-foreground text-xs">
+                  {order.items?.length} items{order.distance_km ? ` • ${order.distance_km.toFixed(1)} km` : ''}
+                </p>
                 <p className="text-primary font-bold text-sm">${order.total_price?.toFixed(2)}</p>
               </div>
               {order.estimated_delivery && order.status !== 'delivered' && order.status !== 'cancelled' && (

@@ -1,9 +1,9 @@
 import React from 'react';
 import { Navigate } from 'react-router-dom';
-import { useAuthDemo } from '../lib/AuthDemoContext';
+import { useAuth } from '../lib/AuthContext';
 
 export default function RoleGuard({ allowedRoles, children, redirectTo = '/signin' }) {
-  const { currentUser } = useAuthDemo();
+  const { currentUser } = useAuth();
 
   if (!currentUser) {
     return <Navigate to="/signin" replace />;

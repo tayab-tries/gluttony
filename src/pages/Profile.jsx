@@ -2,7 +2,8 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronRight, LogOut, User, MapPin, Bell, CreditCard, HelpCircle, Star } from 'lucide-react';
 import MobileLayout from '../components/MobileLayout';
-import { useAuthDemo } from '../lib/AuthDemoContext';
+import { useAuth } from '../lib/AuthContext';
+import { useDeliveryLocation } from '../hooks/useDeliveryLocation';
 
 const MENU_SECTIONS = [
   {
@@ -29,8 +30,9 @@ const MENU_SECTIONS = [
 ];
 
 export default function Profile() {
-  const { currentUser, logout } = useAuthDemo();
+  const { currentUser, logout } = useAuth();
   const navigate = useNavigate();
+  const { location, setLocation, detectCurrentLocation, isDetectingLocation, locationError } = useDeliveryLocation();
 
   const handleLogout = () => {
     logout();
@@ -65,6 +67,38 @@ export default function Profile() {
 
       {/* Menu */}
       <div className="px-5 space-y-4">
+        {currentUser?.role === 'customer' && (
+          <div>
+            <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold mb-2">Delivery</p>
+            <div className="bg-card rounded-2xl border border-border/50 p-4">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-8 h-8 bg-secondary rounded-xl flex items-center justify-center">
+                  <MapPin size={15} className="text-muted-foreground" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-white text-sm">Live delivery address</p>
+                  <p className="text-muted-foreground text-xs">{location.source === 'browser' ? 'Using GPS coordinates for dynamic delivery pricing' : 'Using saved fallback location'}</p>
+                </div>
+                <button
+                  onClick={detectCurrentLocation}
+                  className="rounded-full bg-secondary px-3 py-2 text-[11px] font-semibold text-white"
+                >
+                  {isDetectingLocation ? 'Locating...' : 'Use GPS'}
+                </button>
+              </div>
+              <input
+                value={location.address}
+                onChange={e => setLocation({ address: e.target.value })}
+                className="w-full bg-secondary rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-primary border border-transparent transition-colors"
+              />
+              <p className="text-muted-foreground text-xs mt-2">
+                Coordinates: {location.lat}, {location.lng}
+              </p>
+              {locationError ? <p className="text-red-400 text-xs mt-2">{locationError}</p> : null}
+            </div>
+          </div>
+        )}
+
         {MENU_SECTIONS.map(section => (
           <div key={section.title}>
             <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold mb-2">{section.title}</p>

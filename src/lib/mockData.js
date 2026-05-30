@@ -8,6 +8,7 @@ export const MOCK_RESTAURANTS = [
     delivery_fee: 1.99,
     image_url: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=600&q=80",
     address: "123 Main St",
+    location: { lat: 40.73091, lng: -73.99733 },
     is_open: true,
     tags: ["Burgers", "Fast Food", "American"]
   },
@@ -20,6 +21,7 @@ export const MOCK_RESTAURANTS = [
     delivery_fee: 2.99,
     image_url: "https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=600&q=80",
     address: "456 Oak Ave",
+    location: { lat: 40.74283, lng: -73.98218 },
     is_open: true,
     tags: ["Sushi", "Japanese", "Healthy"]
   },
@@ -32,6 +34,7 @@ export const MOCK_RESTAURANTS = [
     delivery_fee: 0.99,
     image_url: "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=600&q=80",
     address: "789 Elm Rd",
+    location: { lat: 40.75271, lng: -73.97723 },
     is_open: true,
     tags: ["Pizza", "Italian", "Pasta"]
   },
@@ -44,6 +47,7 @@ export const MOCK_RESTAURANTS = [
     delivery_fee: 1.49,
     image_url: "https://images.unsplash.com/photo-1585937421612-70a008356fbe?w=600&q=80",
     address: "321 Spice Lane",
+    location: { lat: 40.72819, lng: -73.98452 },
     is_open: true,
     tags: ["Indian", "Curry", "Vegetarian"]
   },
@@ -56,6 +60,7 @@ export const MOCK_RESTAURANTS = [
     delivery_fee: 1.29,
     image_url: "https://images.unsplash.com/photo-1551504734-5ee1c4a1479b?w=600&q=80",
     address: "654 Fiesta Blvd",
+    location: { lat: 40.73548, lng: -73.97184 },
     is_open: false,
     tags: ["Mexican", "Tacos", "Fast Food"]
   },
@@ -68,6 +73,7 @@ export const MOCK_RESTAURANTS = [
     delivery_fee: 2.49,
     image_url: "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=600&q=80",
     address: "987 Health Ave",
+    location: { lat: 40.74687, lng: -73.99342 },
     is_open: true,
     tags: ["Healthy", "Salads", "Vegan"]
   }
@@ -116,9 +122,14 @@ export const MOCK_ORDERS = [
     ],
     total_price: 30.97,
     delivery_address: "42 Customer Lane, Apt 5",
+    customer_location: { lat: 40.7412, lng: -73.9896 },
     status: "preparing",
     restaurants: ["Burger Palace"],
-    estimated_delivery: "35 min"
+    estimated_delivery: "28-36 min",
+    distance_km: 1.5,
+    delivery_fee: 3.27,
+    service_fee: 0.99,
+    restaurant_locations: [{ id: "r1", name: "Burger Palace", lat: 40.73091, lng: -73.99733 }]
   },
   {
     id: "ord2",
@@ -130,9 +141,16 @@ export const MOCK_ORDERS = [
     ],
     total_price: 35.98,
     delivery_address: "42 Customer Lane, Apt 5",
+    customer_location: { lat: 40.7412, lng: -73.9896 },
     status: "picked_up",
     restaurants: ["Sushi Zen"],
-    estimated_delivery: "15 min"
+    estimated_delivery: "21-29 min",
+    distance_km: 0.8,
+    delivery_fee: 2.67,
+    service_fee: 0.99,
+    restaurant_locations: [{ id: "r2", name: "Sushi Zen", lat: 40.74283, lng: -73.98218 }],
+    driver_name: "Marcus Rivera",
+    driver_location: { lat: 40.74219, lng: -73.98508 }
   },
   {
     id: "ord3",
@@ -143,15 +161,13 @@ export const MOCK_ORDERS = [
     ],
     total_price: 15.99,
     delivery_address: "99 Maple Street",
+    customer_location: { lat: 40.7546, lng: -73.9847 },
     status: "pending",
     restaurants: ["Pizza Roma"],
-    estimated_delivery: "40 min"
+    estimated_delivery: "24-32 min",
+    distance_km: 1.1,
+    delivery_fee: 2.92,
+    service_fee: 0.99,
+    restaurant_locations: [{ id: "r3", name: "Pizza Roma", lat: 40.75271, lng: -73.97723 }]
   },
 ];
-
-export const DEMO_USERS = {
-  "customer@demo.com": { password: "demo123", role: "customer", full_name: "Alex Johnson" },
-  "driver@demo.com": { password: "demo123", role: "driver", full_name: "Marcus Rivera" },
-  "owner@demo.com": { password: "demo123", role: "owner", full_name: "Sarah Chen" },
-  "admin@demo.com": { password: "demo123", role: "admin", full_name: "Jordan Park" },
-};

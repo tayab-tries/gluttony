@@ -1,10 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { MOCK_ORDERS, MOCK_RESTAURANTS } from '../lib/mockData';
-import { base44 } from '../api/base44Client';
-import { useAuthDemo } from '../lib/AuthDemoContext';
+import { useAuth } from '../lib/AuthContext';
+import { fetchOrders, fetchRestaurants, updateOrderStatus } from '../lib/backend';
 
 const STATUS_BADGE = {
   pending: { label: 'New Order', cls: 'text-yellow-400 bg-yellow-400/10 border-yellow-400/20' },
@@ -23,61 +22,69 @@ const NEXT_STATUS = {
 
 export default function OwnerPanel() {
   const [orders, setOrders] = useState([]);
+  const [restaurants, setRestaurants] = useState([]);
   const [activeTab, setActiveTab] = useState('active');
   const [updating, setUpdating] = useState(null);
-  const { currentUser } = useAuthDemo();
+  const { currentUser } = useAuth();
   const navigate = useNavigate();
 
-  // Mock: owner manages "Burger Palace" (r1)
-  const myRestaurant = MOCK_RESTAURANTS[0];
-
   useEffect(() => {
-    loadOrders();
+    let active = true;
+
+    Promise.all([fetchOrders(), fetchRestaurants()]).then(([orderData, restaurantData]) => {
+      if (!active) return;
+      setOrders(orderData);
+      setRestaurants(restaurantData);
+    });
+
+    return () => {
+      active = false;
+    };
   }, []);
 
-  const loadOrders = async () => {
+  const myRestaurant = useMemo(() => {
+    return restaurants.find(restaurant => restaurant.owner_id === currentUser?.id) || restaurants[0];
+  }, [restaurants, currentUser?.id]);
+
+  const myRestaurantOrders = useMemo(() => {
+    if (!myRestaurant) return orders;
+    return orders.filter(order => order.restaurants?.includes(myRestaurant.name));
+  }, [orders, myRestaurant]);
+
+  const handleUpdateStatus = async (orderId, newStatus) => {
+    setUpdating(orderId);
     try {
-      const data = await base44.entities.Order.list('-created_date', 50);
-      setOrders(data.length > 0 ? data : MOCK_ORDERS);
+      const updatedOrder = await updateOrderStatus(orderId, { status: newStatus });
+      setOrders(prev => prev.map(order => (order.id === orderId ? updatedOrder : order)));
     } catch {
-      setOrders(MOCK_ORDERS);
+      setOrders(prev => prev.map(order => (order.id === orderId ? { ...order, status: newStatus } : order)));
+    } finally {
+      setUpdating(null);
     }
   };
 
-  const updateStatus = async (orderId, newStatus) => {
-    setUpdating(orderId);
-    try {
-      await base44.entities.Order.update(orderId, { status: newStatus });
-    } catch {}
-    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
-    setUpdating(null);
-  };
-
-  const activeOrders = orders.filter(o => !['delivered', 'cancelled'].includes(o.status));
-  const completedOrders = orders.filter(o => o.status === 'delivered');
-  const revenue = completedOrders.reduce((s, o) => s + (o.total_price || 0), 0);
-
+  const activeOrders = myRestaurantOrders.filter(order => !['delivered', 'cancelled'].includes(order.status));
+  const completedOrders = myRestaurantOrders.filter(order => order.status === 'delivered');
+  const revenue = completedOrders.reduce((sum, order) => sum + (order.total_price || 0), 0);
   const displayOrders = activeTab === 'active' ? activeOrders : completedOrders;
 
   return (
     <div className="min-h-screen bg-background font-inter" style={{ maxWidth: 430, margin: '0 auto' }}>
-      {/* Header */}
       <div className="bg-card border-b border-border px-5 pt-12 pb-5">
         <div className="flex items-center gap-3 mb-4">
           <button onClick={() => navigate('/profile')} className="w-9 h-9 bg-secondary rounded-full flex items-center justify-center">
             <ArrowLeft size={18} className="text-white" />
           </button>
           <div className="flex-1">
-            <h1 className="text-lg font-bold text-white">{myRestaurant.name}</h1>
+            <h1 className="text-lg font-bold text-white">{myRestaurant?.name || 'Restaurant Panel'}</h1>
             <p className="text-xs text-muted-foreground">Restaurant Panel</p>
           </div>
           <div className="flex items-center gap-1.5 bg-green-500/10 border border-green-500/20 px-3 py-1.5 rounded-full">
             <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
-            <span className="text-green-400 text-xs font-semibold">Open</span>
+            <span className="text-green-400 text-xs font-semibold">{myRestaurant?.is_open ? 'Open' : 'Closed'}</span>
           </div>
         </div>
 
-        {/* Stats */}
         <div className="flex gap-3">
           <div className="flex-1 bg-secondary rounded-xl p-3 text-center">
             <p className="text-xl font-bold text-white">{activeOrders.length}</p>
@@ -94,7 +101,6 @@ export default function OwnerPanel() {
         </div>
       </div>
 
-      {/* Tabs */}
       <div className="flex gap-1 mx-5 mt-5 bg-secondary rounded-xl p-1">
         {['active', 'completed'].map(tab => (
           <button
@@ -134,10 +140,9 @@ export default function OwnerPanel() {
                     </span>
                   </div>
 
-                  {/* Items */}
                   <div className="bg-secondary rounded-xl p-3 mb-3 space-y-1.5">
-                    {order.items?.map((item, i) => (
-                      <div key={i} className="flex justify-between">
+                    {order.items?.map((item, index) => (
+                      <div key={index} className="flex justify-between">
                         <span className="text-white text-xs">{item.quantity}× {item.menu_item_name}</span>
                         <span className="text-muted-foreground text-xs">${(item.price * item.quantity).toFixed(2)}</span>
                       </div>
@@ -149,16 +154,16 @@ export default function OwnerPanel() {
                     </div>
                   </div>
 
-                  {next && (
+                  {next ? (
                     <motion.button
                       whileTap={{ scale: 0.97 }}
                       disabled={updating === order.id}
-                      onClick={() => updateStatus(order.id, next.next)}
+                      onClick={() => handleUpdateStatus(order.id, next.next)}
                       className={`w-full py-3 rounded-xl text-xs font-bold disabled:opacity-60 ${next.color}`}
                     >
                       {updating === order.id ? 'Updating...' : next.label}
                     </motion.button>
-                  )}
+                  ) : null}
                 </div>
               </motion.div>
             );

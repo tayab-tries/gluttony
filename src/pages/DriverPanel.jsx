@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, MapPin, Package, CheckCircle2 } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { MOCK_ORDERS } from '../lib/mockData';
-import { base44 } from '../api/base44Client';
-import { useAuthDemo } from '../lib/AuthDemoContext';
+import { useAuth } from '../lib/AuthContext';
+import { fetchOrders, updateOrderStatus } from '../lib/backend';
+import { getDriverLocation } from '../lib/delivery';
+import DeliveryMapCard from '../components/DeliveryMapCard';
 
 const STATUS_BADGE = {
   pending: { label: 'Pending', cls: 'text-yellow-400 bg-yellow-400/10' },
@@ -17,37 +18,40 @@ const STATUS_BADGE = {
 export default function DriverPanel() {
   const [orders, setOrders] = useState([]);
   const [updating, setUpdating] = useState(null);
-  const { currentUser } = useAuthDemo();
+  const { currentUser } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    loadOrders();
-  }, []);
+    let active = true;
+    fetchOrders({ driverEmail: currentUser?.email }).then(data => {
+      if (active) setOrders(data.filter(order => order.status !== 'cancelled'));
+    });
+    return () => {
+      active = false;
+    };
+  }, [currentUser?.email]);
 
-  const loadOrders = async () => {
+  const handleUpdateStatus = async (orderId, newStatus) => {
+    setUpdating(orderId);
     try {
-      const data = await base44.entities.Order.filter({ driver_email: currentUser?.email });
-      setOrders(data.length > 0 ? data : MOCK_ORDERS.filter(o => o.status !== 'cancelled'));
+      const updatedOrder = await updateOrderStatus(orderId, {
+        status: newStatus,
+        driverEmail: currentUser?.email,
+        driverName: currentUser?.full_name,
+      });
+      setOrders(prev => prev.map(order => (order.id === orderId ? updatedOrder : order)));
     } catch {
-      setOrders(MOCK_ORDERS.filter(o => o.status !== 'cancelled'));
+      setOrders(prev => prev.map(order => (order.id === orderId ? { ...order, status: newStatus } : order)));
+    } finally {
+      setUpdating(null);
     }
   };
 
-  const updateStatus = async (orderId, newStatus) => {
-    setUpdating(orderId);
-    try {
-      await base44.entities.Order.update(orderId, { status: newStatus });
-    } catch {}
-    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
-    setUpdating(null);
-  };
-
-  const activeOrders = orders.filter(o => !['delivered', 'cancelled'].includes(o.status));
-  const completedOrders = orders.filter(o => o.status === 'delivered');
+  const activeOrders = orders.filter(order => !['delivered', 'cancelled'].includes(order.status));
+  const completedOrders = orders.filter(order => order.status === 'delivered');
 
   return (
     <div className="min-h-screen bg-background font-inter" style={{ maxWidth: 430, margin: '0 auto' }}>
-      {/* Header */}
       <div className="bg-card border-b border-border px-5 pt-12 pb-4">
         <div className="flex items-center gap-3 mb-3">
           <button onClick={() => navigate('/profile')} className="w-9 h-9 bg-secondary rounded-full flex items-center justify-center">
@@ -73,14 +77,13 @@ export default function DriverPanel() {
             <p className="text-xs text-muted-foreground">Delivered</p>
           </div>
           <div className="flex-1 bg-secondary rounded-xl p-3 text-center">
-            <p className="text-xl font-bold text-primary">${(completedOrders.reduce((s, o) => s + (o.total_price || 0), 0) * 0.1).toFixed(0)}</p>
+            <p className="text-xl font-bold text-primary">${(completedOrders.reduce((sum, order) => sum + (order.total_price || 0), 0) * 0.1).toFixed(0)}</p>
             <p className="text-xs text-muted-foreground">Earnings</p>
           </div>
         </div>
       </div>
 
       <div className="px-5 py-5 space-y-4">
-        {/* Active Orders */}
         <div>
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Active Orders</p>
           {activeOrders.length === 0 ? (
@@ -92,6 +95,7 @@ export default function DriverPanel() {
             <div className="space-y-3">
               {activeOrders.map(order => {
                 const badge = STATUS_BADGE[order.status] || STATUS_BADGE.pending;
+                const driverLocation = order.driver_location || getDriverLocation(order);
                 return (
                   <motion.div
                     key={order.id}
@@ -122,7 +126,42 @@ export default function DriverPanel() {
                         <div>
                           <p className="text-xs text-muted-foreground">Deliver to</p>
                           <p className="text-white text-xs font-medium">{order.delivery_address}</p>
+                          <p className="text-primary text-[11px] mt-1">{order.estimated_delivery} • {order.distance_km ? `${order.distance_km.toFixed(1)} km` : 'Awaiting route'}</p>
                         </div>
+                      </div>
+
+                      <div className="mt-3">
+                        <DeliveryMapCard
+                          points={[
+                            ...(order.restaurant_locations || []).map(restaurant => ({
+                              id: restaurant.id,
+                              label: restaurant.name,
+                              type: 'restaurant',
+                              lat: restaurant.lat,
+                              lng: restaurant.lng,
+                            })),
+                            ...(driverLocation
+                              ? [{
+                                  id: 'driver',
+                                  label: order.driver_name || currentUser?.full_name || 'Driver',
+                                  type: 'driver',
+                                  lat: driverLocation.lat,
+                                  lng: driverLocation.lng,
+                                }]
+                              : []),
+                            ...(order.customer_location
+                              ? [{
+                                  id: 'customer',
+                                  label: order.delivery_address,
+                                  type: 'customer',
+                                  lat: order.customer_location.lat,
+                                  lng: order.customer_location.lng,
+                                }]
+                              : []),
+                          ]}
+                          etaLabel={order.estimated_delivery}
+                          addressLabel={order.delivery_address}
+                        />
                       </div>
 
                       <div className="mt-3 flex gap-2">
@@ -130,7 +169,7 @@ export default function DriverPanel() {
                           <motion.button
                             whileTap={{ scale: 0.96 }}
                             disabled={updating === order.id}
-                            onClick={() => updateStatus(order.id, 'picked_up')}
+                            onClick={() => handleUpdateStatus(order.id, 'picked_up')}
                             className="flex-1 bg-primary text-primary-foreground py-3 rounded-xl text-xs font-bold disabled:opacity-60"
                           >
                             {updating === order.id ? 'Updating...' : '📦 Mark as Picked Up'}
@@ -140,7 +179,7 @@ export default function DriverPanel() {
                           <motion.button
                             whileTap={{ scale: 0.96 }}
                             disabled={updating === order.id}
-                            onClick={() => updateStatus(order.id, 'delivered')}
+                            onClick={() => handleUpdateStatus(order.id, 'delivered')}
                             className="flex-1 bg-green-500 text-white py-3 rounded-xl text-xs font-bold disabled:opacity-60"
                           >
                             {updating === order.id ? 'Updating...' : '✅ Mark as Delivered'}
@@ -160,7 +199,6 @@ export default function DriverPanel() {
           )}
         </div>
 
-        {/* Completed */}
         {completedOrders.length > 0 && (
           <div>
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Completed Today</p>

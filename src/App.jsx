@@ -2,9 +2,8 @@ import { Toaster } from './components/ui/sonner';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { queryClientInstance } from './lib/query-client';
 import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
-import PageNotFound from './lib/PageNotFound';
 import { CartProvider } from './lib/CartContext';
-import { AuthDemoProvider, useAuthDemo } from './lib/AuthDemoContext';
+import { AuthProvider, useAuth } from './lib/AuthContext';
 
 // Pages
 import SignIn from './pages/SignIn';
@@ -19,7 +18,15 @@ import OwnerPanel from './pages/OwnerPanel';
 import AdminPanel from './pages/AdminPanel';
 
 function AppRouter() {
-  const { currentUser } = useAuthDemo();
+  const { currentUser, authReady } = useAuth();
+
+  if (!authReady) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <Routes>
@@ -48,7 +55,8 @@ function AppRouter() {
 }
 
 function RequireRole({ allowed, children }) {
-  const { currentUser } = useAuthDemo();
+  const { currentUser, authReady } = useAuth();
+  if (!authReady) return null;
   if (!currentUser) return <Navigate to="/signin" replace />;
   if (!allowed.includes(currentUser.role)) return <Navigate to={getDefaultRoute(currentUser.role)} replace />;
   return children;
@@ -61,7 +69,7 @@ function getDefaultRoute(role) {
 
 function App() {
   return (
-    <AuthDemoProvider>
+    <AuthProvider>
       <CartProvider>
         <QueryClientProvider client={queryClientInstance}>
           <Router>
@@ -72,7 +80,7 @@ function App() {
           <Toaster />
         </QueryClientProvider>
       </CartProvider>
-    </AuthDemoProvider>
+    </AuthProvider>
   );
 }
 
