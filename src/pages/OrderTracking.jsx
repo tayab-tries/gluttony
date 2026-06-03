@@ -25,22 +25,44 @@ export default function OrderTracking() {
 
   useEffect(() => {
     let active = true;
+    let intervalId = null;
 
     async function load() {
-      const localDraft = localStorage.getItem(`gluttony_order_${id}`);
-      if (localDraft) {
-        if (active) setOrder(JSON.parse(localDraft));
-        return;
+      let currentOrder = null;
+      try {
+        const data = await fetchOrder(id);
+        if (data) {
+          currentOrder = data;
+        }
+      } catch (err) {}
+
+      if (!currentOrder) {
+        const localDraft = localStorage.getItem(`gluttony_order_${id}`);
+        if (localDraft) {
+          currentOrder = JSON.parse(localDraft);
+        }
       }
 
-      const data = await fetchOrder(id);
-      if (active) setOrder(data);
+      if (currentOrder && active) {
+        setOrder(currentOrder);
+        if (['delivered', 'cancelled'].includes(currentOrder.status) && intervalId) {
+          clearInterval(intervalId);
+          intervalId = null;
+        }
+      }
     }
 
     load();
 
+    intervalId = setInterval(() => {
+      load();
+    }, 3000);
+
     return () => {
       active = false;
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
     };
   }, [id]);
 

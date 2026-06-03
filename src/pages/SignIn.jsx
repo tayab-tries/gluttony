@@ -71,7 +71,6 @@ export default function SignIn() {
         <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-black/40 to-background" />
         <div className="absolute bottom-6 left-6">
           <span className="text-2xl font-bold text-white tracking-tight">Gluttony</span>
-          <p className="text-white/70 text-sm">Supabase auth with a same-repo delivery backend</p>
         </div>
       </div>
 
@@ -96,7 +95,7 @@ export default function SignIn() {
 
         <h2 className="text-2xl font-bold text-white mb-1">{mode === 'signin' ? 'Welcome back' : 'Create your account'}</h2>
         <p className="text-muted-foreground text-sm mb-6">
-          {mode === 'signin' ? 'Use your Supabase account to continue' : 'Create a role-based account for the app'}
+          {mode === 'signin' ? 'Use your account to continue' : 'Create a role-based account for the app'}
         </p>
 
         {!hasSupabaseEnv && (

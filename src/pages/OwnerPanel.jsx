@@ -31,20 +31,44 @@ export default function OwnerPanel() {
   useEffect(() => {
     let active = true;
 
-    Promise.all([fetchOrders(), fetchRestaurants()]).then(([orderData, restaurantData]) => {
-      if (!active) return;
-      setOrders(orderData);
-      setRestaurants(restaurantData);
+    fetchRestaurants().then(restaurantData => {
+      if (active) setRestaurants(restaurantData);
     });
+
+    async function loadOrders() {
+      try {
+        const orderData = await fetchOrders();
+        if (active) setOrders(orderData);
+      } catch (err) {}
+    }
+
+    loadOrders();
+
+    const interval = setInterval(() => {
+      loadOrders();
+    }, 5000);
 
     return () => {
       active = false;
+      clearInterval(interval);
     };
   }, []);
 
+  const [selectedRestaurantId, setSelectedRestaurantId] = useState('');
+
+  useEffect(() => {
+    if (restaurants.length > 0 && !selectedRestaurantId) {
+      const owned = restaurants.find(r => r.owner_id === currentUser?.id);
+      setSelectedRestaurantId(owned ? owned.id : restaurants[0].id);
+    }
+  }, [restaurants, currentUser?.id, selectedRestaurantId]);
+
   const myRestaurant = useMemo(() => {
+    if (selectedRestaurantId) {
+      return restaurants.find(r => r.id === selectedRestaurantId);
+    }
     return restaurants.find(restaurant => restaurant.owner_id === currentUser?.id) || restaurants[0];
-  }, [restaurants, currentUser?.id]);
+  }, [restaurants, currentUser?.id, selectedRestaurantId]);
 
   const myRestaurantOrders = useMemo(() => {
     if (!myRestaurant) return orders;
@@ -75,9 +99,23 @@ export default function OwnerPanel() {
           <button onClick={() => navigate('/profile')} className="w-9 h-9 bg-secondary rounded-full flex items-center justify-center">
             <ArrowLeft size={18} className="text-white" />
           </button>
-          <div className="flex-1">
-            <h1 className="text-lg font-bold text-white">{myRestaurant?.name || 'Restaurant Panel'}</h1>
-            <p className="text-xs text-muted-foreground">Restaurant Panel</p>
+          <div className="flex-1 min-w-0">
+            {restaurants.length > 0 ? (
+              <select
+                value={myRestaurant?.id || ''}
+                onChange={e => setSelectedRestaurantId(e.target.value)}
+                className="bg-transparent text-white font-bold text-base focus:outline-none border-b border-border/40 pb-0.5 cursor-pointer max-w-[200px]"
+              >
+                {restaurants.map(r => (
+                  <option key={r.id} value={r.id} className="bg-card text-white text-sm">
+                    {r.name}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <h1 className="text-lg font-bold text-white">Restaurant Panel</h1>
+            )}
+            <p className="text-[10px] text-muted-foreground mt-0.5">Managing Restaurant</p>
           </div>
           <div className="flex items-center gap-1.5 bg-green-500/10 border border-green-500/20 px-3 py-1.5 rounded-full">
             <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
